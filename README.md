@@ -1,2 +1,23 @@
-# Snake.exe
-Classic Snake Game in C++ | Console-based | OOP concepts | Score tracking &amp; restart option
+# 🐍 Snake Game in C++
+
+A simple console-based Snake Game built using **C++**.  
+This project demonstrates basic **OOP concepts, data structures, and game logic**.
+
+## 🎮 Features
+- Grid-based play area
+- Snake movement with keyboard (W/A/S/D or Arrow keys)
+- Food spawns randomly
+- Score tracking system
+- Game-over when snake hits wall or itself
+- Option to restart after Game Over
+
+## ⚙️ Tech Stack
+- Language: **C++**
+- Data Structures: Queue/Linked List (Snake body), 2D array (Grid)
+- Concepts: Loops, Conditionals, Functions, OOP
+
+## 🚀 How to Run
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/<your-username>/snake-game-cpp.git
+   cd snake-game-cpp
