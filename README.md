@@ -29,6 +29,9 @@ This project demonstrates basic **OOP concepts, data structures, and game logic*
 
 ## 🌟 Future Enhancements
 -Add obstacles
+
 -Multiple levels
+
 -Special food (bonus points)
+
 -GUI version with SFML/SDL
