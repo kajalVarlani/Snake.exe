@@ -21,3 +21,14 @@ This project demonstrates basic **OOP concepts, data structures, and game logic*
    ```bash
    git clone https://github.com/<your-username>/snake-game-cpp.git
    cd snake-game-cpp
+2. Compile the code:
+   g++ snake_game.cpp -o snake_game
+
+3. Run the game:
+   ./snake_game
+
+## 🌟 Future Enhancements
+-Add obstacles
+-Multiple levels
+-Special food (bonus points)
+-GUI version with SFML/SDL
