@@ -3,44 +3,90 @@
 #include <deque>
 #include <cstdlib>
 #include <ctime>
-#include <conio.h>
-#include <windows.h>
-
+#include <cctype>
 using namespace std;
 
-// ANSI escape codes for colors
-#define RESET   "\033[0m"
-#define GREEN   "\033[32m"
-#define RED     "\033[31m"
-#define WHITE   "\033[37m"
-#define YELLOW  "\033[33m"
-#define CYAN    "\033[36m"
+// Platform-specific headers
+#ifdef _WIN32
+#include <conio.h>
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <termios.h>
+#include <fcntl.h>
+#endif
 
+// ---------- Cross-Platform Utilities ----------
+#ifndef _WIN32
+int _kbhit() {
+    termios oldt, newt;
+    int ch;
+    int oldf;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+    ch = getchar();
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
+    if (ch != EOF) {
+        ungetc(ch, stdin);
+        return 1;
+    }
+    return 0;
+}
+
+int _getch() {
+    struct termios oldt, newt;
+    int ch;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    ch = getchar();
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    return ch;
+}
+
+void Sleep(int ms) { usleep(ms * 1000); }
+void clearScreen() { system("clear"); }
+#else
+void clearScreen() { system("cls"); }
+#endif
+
+// ---------- Colors ----------
+#define RESET "\033[0m"
+#define GREEN "\033[32m"
+#define RED "\033[31m"
+#define WHITE "\033[37m"
+#define YELLOW "\033[33m"
+#define CYAN "\033[36m"
+
+// ---------- Classes ----------
 class Point {
 public:
     int x, y;
     Point(int x = 0, int y = 0) : x(x), y(y) {}
-    bool operator==(const Point& other) const {
-        return x == other.x && y == other.y;
-    }
+    bool operator==(const Point &other) const { return x == other.x && y == other.y; }
 };
 
 enum Direction { UP, DOWN, LEFT, RIGHT };
 
 class Food {
-private:
     Point position;
     bool active;
+
 public:
     Food() : active(false) {}
-
-    void generate(const deque<Point>& snakeBody, int width, int height) {
+    void generate(const deque<Point> &snakeBody, int width, int height) {
         vector<Point> valid;
         for (int i = 1; i < height - 1; i++) {
             for (int j = 1; j < width - 1; j++) {
                 Point candidate(i, j);
                 bool onSnake = false;
-                for (auto& seg : snakeBody) {
+                for (auto &seg : snakeBody) {
                     if (seg == candidate) { onSnake = true; break; }
                 }
                 if (!onSnake) valid.push_back(candidate);
@@ -52,16 +98,15 @@ public:
             active = true;
         }
     }
-
     Point getPos() const { return position; }
     bool isActive() const { return active; }
     void deactivate() { active = false; }
 };
 
 class Snake {
-private:
     deque<Point> body;
     Direction dir;
+
 public:
     Snake(int width, int height) {
         dir = RIGHT;
@@ -79,7 +124,7 @@ public:
         dir = newDir;
     }
 
-    bool move(Food& food, int& score, int width, int height) {
+    bool move(Food &food, int &score, int width, int height) {
         Point head = body.front();
         switch (dir) {
             case UP: head.x--; break;
@@ -88,12 +133,12 @@ public:
             case RIGHT: head.y++; break;
         }
 
-        // collision with walls
-      if (head.x < 1 || head.x >= height - 1 || head.y < 1 || head.y >= width - 1)
-         return false;
+        // Wall collision
+        if (head.x < 0 || head.x >= height - 1 || head.y < 1 || head.y >= width - 2)
+            return false;
 
-        // collision with itself
-        for (auto& seg : body)
+        // Self collision
+        for (auto &seg : body)
             if (head == seg) return false;
 
         body.push_front(head);
@@ -104,17 +149,15 @@ public:
         } else {
             body.pop_back();
         }
-
         return true;
     }
 
-    const deque<Point>& getBody() const { return body; }
+    const deque<Point> &getBody() const { return body; }
     Point getHead() const { return body.front(); }
     Direction getDir() const { return dir; }
 };
 
 class Game {
-private:
     int width, height;
     Snake snake;
     Food food;
@@ -128,38 +171,32 @@ public:
         highScore = 0;
         gameOver = false;
         food.generate(snake.getBody(), width, height);
-
-        // Enable ANSI colors on Windows console
-        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        DWORD dwMode = 0;
-        GetConsoleMode(hOut, &dwMode);
-        dwMode |= 0x0004; // ENABLE_VIRTUAL_TERMINAL_PROCESSING
-        SetConsoleMode(hOut, dwMode);
     }
 
     void draw() {
-        // move cursor to top-left
+        // Move cursor to top-left
+#ifdef _WIN32
         COORD coord = {0, 0};
         SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
-
+#else
+        cout << "\033[H";
+#endif
         string buffer;
-
-        // top border
         buffer += WHITE;
         buffer += " ";
         for (int j = 0; j < width - 2; j++) buffer += "_";
         buffer += " \n";
 
-        // grid
-        for (int i = 0; i < height; i++) {
+        for (int i = 0; i < height - 1; i++) {
             buffer += WHITE;
-            buffer += "|"; // left wall
+            buffer += "|";
             for (int j = 0; j < width - 2; j++) {
                 Point cur(i, j + 1);
-                if (snake.getHead() == cur) buffer += string(GREEN) + "O" + WHITE;
+                if (snake.getHead() == cur)
+                    buffer += string(GREEN) + "O" + WHITE;
                 else {
                     bool isBody = false;
-                    for (auto& seg : snake.getBody()) {
+                    for (auto &seg : snake.getBody()) {
                         if (seg == cur && !(seg == snake.getHead())) {
                             buffer += string(GREEN) + "o" + WHITE;
                             isBody = true;
@@ -173,17 +210,14 @@ public:
                     }
                 }
             }
-            buffer += "|\n"; // right wall
+            buffer += "|\n";
         }
 
-        // bottom border
         buffer += " ";
         for (int j = 0; j < width - 2; j++) buffer += "_";
         buffer += " \n";
 
-        // scoreboard (centered)
-        string scoreLine = " Score: " + to_string(score) +
-                           " | High Score: " + to_string(highScore);
+        string scoreLine = " Score: " + to_string(score) + " | High Score: " + to_string(highScore);
         int pad = max(0, (width - (int)scoreLine.size()) / 2);
         buffer += string(YELLOW) + string(pad, ' ') + scoreLine + "\n" + RESET;
 
@@ -199,23 +233,13 @@ public:
     void input() {
         if (_kbhit()) {
             int key = _getch();
-            if (key == 224 || key == 0) {
-                key = _getch();
-                switch (key) {
-                    case 72: snake.changeDir(UP); break;
-                    case 80: snake.changeDir(DOWN); break;
-                    case 75: snake.changeDir(LEFT); break;
-                    case 77: snake.changeDir(RIGHT); break;
-                }
-            } else {
-                switch (tolower(key)) {
-                    case 'w': snake.changeDir(UP); break;
-                    case 's': snake.changeDir(DOWN); break;
-                    case 'a': snake.changeDir(LEFT); break;
-                    case 'd': snake.changeDir(RIGHT); break;
-                    case 'r': if (gameOver) reset(); break;
-                    case 'q': if (gameOver) exit(0); break;
-                }
+            switch (tolower(key)) {
+                case 'w': snake.changeDir(UP); break;
+                case 's': snake.changeDir(DOWN); break;
+                case 'a': snake.changeDir(LEFT); break;
+                case 'd': snake.changeDir(RIGHT); break;
+                case 'r': if (gameOver) reset(); break;
+                case 'q': if (gameOver) exit(0); break;
             }
         }
     }
@@ -243,43 +267,42 @@ public:
             draw();
             input();
             update();
-            int speed = max(40, 150 - score * 5); // faster as score increases
+            int speed = max(40, 150 - score * 5);
             Sleep(speed);
         }
     }
 };
 
-// 🎯 TITLE SCREEN
+// ---------- Title Screen ----------
 void showTitleScreen() {
-    system("cls");
+    clearScreen();
     cout << GREEN << R"(
 
    ____   _   _    ___    _   _   _____     ____        _      __  __   _____ 
   / ___| | \ | |  / _ \  | \ | | | ____|   / ___|      / \    |  \/  | | ____|
-  \___ \ |  \| |  | | |  |  \| | |  _|     | |  _     / _ \   | |\/| | |  _|  
-   ___) || |\  |  | |_|  | | |\| | |___    | |_| |   / ___ \  | |  | | | |___ 
-  |____/ |_| \_|  \___/  |_| \_| |_____|   \_____|  /_/   \_\ |_|  |_| |_____|
+  \___ \ |  \| | | | | | |  \| | |  _|     | |  _     / _ \   | |\/| | |  _|  
+   ___) || |\  | | |_| | | |\  | | |___    | |_| |   / ___ \  | |  | | | |___ 
+  |____/ |_| \_|  \___/  |_| \_| |_____|    \_____|  /_/   \_\ |_|  |_| |_____|
     )" << RESET << endl;
 
     cout << YELLOW;
     cout << "\n Controls:\n";
-    cout << "   W / (Arrow Up)    = Move Up\n";
-    cout << "   S / (Arrow Down)  = Move Down\n";
-    cout << "   A / (Arrow Left)  = Move Left\n";
-    cout << "   D / (Arrow Right) = Move Right\n";
+    cout << "   W = Move Up\n";
+    cout << "   S = Move Down\n";
+    cout << "   A = Move Left\n";
+    cout << "   D = Move Right\n";
     cout << "   R = Restart (after Game Over)\n";
     cout << "   Q = Quit (after Game Over)\n";
     cout << RESET;
 
     cout << CYAN << "\nPress any key to start the game..." << RESET << endl;
     _getch();
-    system("cls");
+    clearScreen();
 }
 
-
 int main() {
-    showTitleScreen();  // show title before game
-    Game game(90, 25);  // bigger grid
+    showTitleScreen();
+    Game game(90, 25);
     game.run();
     return 0;
 }
