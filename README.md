@@ -22,10 +22,10 @@ This project demonstrates basic **OOP concepts, data structures, and game logic*
    git clone https://github.com/<your-username>/snake-game-cpp.git
    cd snake-game-cpp
 2. Compile the code:
-   g++ snake_game.cpp -o snake_game
+   g++ main.cpp -o main
 
 3. Run the game:
-   ./snake_game
+   ./main.cpp
 
 ## 🌟 Future Enhancements
 -Add obstacles
