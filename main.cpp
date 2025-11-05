@@ -18,7 +18,8 @@ using namespace std;
 
 // ---------- Cross-Platform Utilities ----------
 #ifndef _WIN32
-int _kbhit() {
+int _kbhit()
+{
     termios oldt, newt;
     int ch;
     int oldf;
@@ -31,14 +32,16 @@ int _kbhit() {
     ch = getchar();
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
     fcntl(STDIN_FILENO, F_SETFL, oldf);
-    if (ch != EOF) {
+    if (ch != EOF)
+    {
         ungetc(ch, stdin);
         return 1;
     }
     return 0;
 }
 
-int _getch() {
+int _getch()
+{
     struct termios oldt, newt;
     int ch;
     tcgetattr(STDIN_FILENO, &oldt);
@@ -59,40 +62,69 @@ void clearScreen() { system("cls"); }
 // ---------- Colors ----------
 #define RESET "\033[0m"
 #define GREEN "\033[32m"
+#define LIGHT_GREEN "\033[92m"
 #define RED "\033[31m"
-#define WHITE "\033[37m"
-#define YELLOW "\033[33m"
 #define CYAN "\033[36m"
+#define YELLOW "\033[33m"
+#define BOLD "\033[1m"
+#define RESET "\033[0m"
+#define BOLD "\033[1m"
+#define NEON_GREEN "\033[38;5;46m"
+#define NEON_CYAN "\033[38;5;51m"
+#define NEON_PURPLE "\033[38;5;165m"
+#define NEON_YELLOW "\033[38;5;226m"
+#define GOLD "\033[38;5;220m"
+#define BRIGHT_CYAN "\033[38;5;87m"
+#define PINK "\033[38;5;213m"
+#define NEON_RED "\033[38;5;196m"
 
 // ---------- Classes ----------
-class Point {
+class Point
+{
 public:
     int x, y;
     Point(int x = 0, int y = 0) : x(x), y(y) {}
     bool operator==(const Point &other) const { return x == other.x && y == other.y; }
 };
 
-enum Direction { UP, DOWN, LEFT, RIGHT };
+enum Direction
+{
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT
+};
 
-class Food {
+class Food
+{
     Point position;
     bool active;
 
 public:
     Food() : active(false) {}
-    void generate(const deque<Point> &snakeBody, int width, int height) {
+    void generate(const deque<Point> &snakeBody, int width, int height)
+    {
         vector<Point> valid;
-        for (int i = 1; i < height - 1; i++) {
-            for (int j = 1; j < width - 1; j++) {
+        for (int i = 0; i < height - 2; i++)
+        {
+            for (int j = 1; j < width - 1; j++)
+            {
                 Point candidate(i, j);
                 bool onSnake = false;
-                for (auto &seg : snakeBody) {
-                    if (seg == candidate) { onSnake = true; break; }
+                for (auto &seg : snakeBody)
+                {
+                    if (seg == candidate)
+                    {
+                        onSnake = true;
+                        break;
+                    }
                 }
-                if (!onSnake) valid.push_back(candidate);
+                if (!onSnake)
+                    valid.push_back(candidate);
             }
         }
-        if (!valid.empty()) {
+        if (!valid.empty())
+        {
             int idx = rand() % valid.size();
             position = valid[idx];
             active = true;
@@ -103,12 +135,14 @@ public:
     void deactivate() { active = false; }
 };
 
-class Snake {
+class Snake
+{
     deque<Point> body;
     Direction dir;
 
 public:
-    Snake(int width, int height) {
+    Snake(int width, int height)
+    {
         dir = RIGHT;
         int startX = height / 2;
         int startY = width / 2;
@@ -117,36 +151,51 @@ public:
         body.push_back(Point(startX, startY - 2));
     }
 
-    void changeDir(Direction newDir) {
+    void changeDir(Direction newDir)
+    {
         if ((dir == UP && newDir == DOWN) || (dir == DOWN && newDir == UP) ||
             (dir == LEFT && newDir == RIGHT) || (dir == RIGHT && newDir == LEFT))
             return;
         dir = newDir;
     }
 
-    bool move(Food &food, int &score, int width, int height) {
+    bool move(Food &food, int &score, int width, int height)
+    {
         Point head = body.front();
-        switch (dir) {
-            case UP: head.x--; break;
-            case DOWN: head.x++; break;
-            case LEFT: head.y--; break;
-            case RIGHT: head.y++; break;
+        switch (dir)
+        {
+        case UP:
+            head.x--;
+            break;
+        case DOWN:
+            head.x++;
+            break;
+        case LEFT:
+            head.y--;
+            break;
+        case RIGHT:
+            head.y++;
+            break;
         }
 
         // Wall collision
-        if (head.x < 0 || head.x >= height - 1 || head.y < 1 || head.y >= width - 2)
+        if (head.x < 0 || head.x >= height - 1 || head.y <= 0 || head.y >= width - 1)
             return false;
 
         // Self collision
         for (auto &seg : body)
-            if (head == seg) return false;
+            if (head == seg)
+                return false;
 
         body.push_front(head);
 
-        if (food.isActive() && head == food.getPos()) {
+        if (food.isActive() && head == food.getPos())
+        {
             score++;
             food.deactivate();
-        } else {
+        }
+        else
+        {
             body.pop_back();
         }
         return true;
@@ -154,10 +203,10 @@ public:
 
     const deque<Point> &getBody() const { return body; }
     Point getHead() const { return body.front(); }
-    Direction getDir() const { return dir; }
 };
 
-class Game {
+class Game
+{
     int width, height;
     Snake snake;
     Food food;
@@ -165,7 +214,8 @@ class Game {
     bool gameOver;
 
 public:
-    Game(int w = 40, int h = 20) : width(w), height(h), snake(w, h) {
+    Game(int w = 40, int h = 20) : width(w), height(h), snake(w, h)
+    {
         srand(time(0));
         score = 0;
         highScore = 0;
@@ -173,97 +223,127 @@ public:
         food.generate(snake.getBody(), width, height);
     }
 
-    void draw() {
-        // Move cursor to top-left
+    void draw()
+    {
 #ifdef _WIN32
         COORD coord = {0, 0};
         SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 #else
         cout << "\033[H";
 #endif
-        string buffer;
-        buffer += WHITE;
-        buffer += " ";
-        for (int j = 0; j < width - 2; j++) buffer += "_";
-        buffer += " \n";
 
-        for (int i = 0; i < height - 1; i++) {
-            buffer += WHITE;
-            buffer += "|";
-            for (int j = 0; j < width - 2; j++) {
+        // Top border
+        cout << CYAN << " ";
+        for (int j = 0; j < width - 2; j++)
+            cout << "_";
+        cout << " \n";
+
+        // Game area
+        for (int i = 0; i < height - 1; i++)
+        {
+            cout << CYAN << "|" << RESET;
+            for (int j = 0; j < width - 2; j++)
+            {
                 Point cur(i, j + 1);
                 if (snake.getHead() == cur)
-                    buffer += string(GREEN) + "O" + WHITE;
-                else {
+                    cout << GREEN << "O" << RESET;
+                else
+                {
                     bool isBody = false;
-                    for (auto &seg : snake.getBody()) {
-                        if (seg == cur && !(seg == snake.getHead())) {
-                            buffer += string(GREEN) + "o" + WHITE;
+                    for (auto &seg : snake.getBody())
+                    {
+                        if (seg == cur && !(seg == snake.getHead()))
+                        {
+                            cout << LIGHT_GREEN << "o" << RESET;
                             isBody = true;
                             break;
                         }
                     }
-                    if (!isBody) {
+                    if (!isBody)
+                    {
                         if (food.isActive() && cur == food.getPos())
-                            buffer += string(RED) + "@" + WHITE;
-                        else buffer += " ";
+                            cout << RED << "@" << RESET;
+                        else
+                            cout << " ";
                     }
                 }
             }
-            buffer += "|\n";
+            cout << CYAN << "|" << RESET << "\n";
         }
 
-        buffer += " ";
-        for (int j = 0; j < width - 2; j++) buffer += "_";
-        buffer += " \n";
+        // Bottom border
+        cout << CYAN << " ";
+        for (int j = 0; j < width - 2; j++)
+            cout << "_";
+        cout << " \n";
 
-        string scoreLine = " Score: " + to_string(score) + " | High Score: " + to_string(highScore);
-        int pad = max(0, (width - (int)scoreLine.size()) / 2);
-        buffer += string(YELLOW) + string(pad, ' ') + scoreLine + "\n" + RESET;
+        // Score
+        cout << YELLOW << " Score: " << score << " | High Score: " << highScore << RESET << "\n";
 
-        if (gameOver) {
-            string msg = " GAME OVER! Press R to restart or Q to quit ";
-            int pad2 = max(0, (width - (int)msg.size()) / 2);
-            buffer += string(RED) + string(pad2, ' ') + msg + "\n" + RESET;
-        }
-
-        cout << buffer;
+        if (gameOver)
+            cout << RED << " GAME OVER! Press R to restart or Q to quit" << RESET << "\n";
     }
 
-    void input() {
-        if (_kbhit()) {
+    void input()
+    {
+        if (_kbhit())
+        {
             int key = _getch();
-            switch (tolower(key)) {
-                case 'w': snake.changeDir(UP); break;
-                case 's': snake.changeDir(DOWN); break;
-                case 'a': snake.changeDir(LEFT); break;
-                case 'd': snake.changeDir(RIGHT); break;
-                case 'r': if (gameOver) reset(); break;
-                case 'q': if (gameOver) exit(0); break;
+            switch (tolower(key))
+            {
+            case 'w':
+                snake.changeDir(UP);
+                break;
+            case 's':
+                snake.changeDir(DOWN);
+                break;
+            case 'a':
+                snake.changeDir(LEFT);
+                break;
+            case 'd':
+                snake.changeDir(RIGHT);
+                break;
+            case 'r':
+                if (gameOver)
+                    reset();
+                break;
+            case 'q':
+                if (gameOver)
+                    exit(0);
+                break;
             }
         }
     }
 
-    void update() {
-        if (!gameOver) {
-            if (!snake.move(food, score, width, height)) {
+    void update()
+    {
+        if (!gameOver)
+        {
+            if (!snake.move(food, score, width, height))
+            {
                 gameOver = true;
-                if (score > highScore) highScore = score;
-            } else if (!food.isActive()) {
+                if (score > highScore)
+                    highScore = score;
+            }
+            else if (!food.isActive())
+            {
                 food.generate(snake.getBody(), width, height);
             }
         }
     }
 
-    void reset() {
+    void reset()
+    {
         snake = Snake(width, height);
         score = 0;
         food.generate(snake.getBody(), width, height);
         gameOver = false;
     }
 
-    void run() {
-        while (true) {
+    void run()
+    {
+        while (true)
+        {
             draw();
             input();
             update();
@@ -274,35 +354,51 @@ public:
 };
 
 // ---------- Title Screen ----------
-void showTitleScreen() {
+void showTitleScreen()
+{
     clearScreen();
-    cout << GREEN << R"(
 
-   ____   _   _    ___    _   _   _____     ____        _      __  __   _____ 
-  / ___| | \ | |  / _ \  | \ | | | ____|   / ___|      / \    |  \/  | | ____|
-  \___ \ |  \| | | | | | |  \| | |  _|     | |  _     / _ \   | |\/| | |  _|  
-   ___) || |\  | | |_| | | |\  | | |___    | |_| |   / ___ \  | |  | | | |___ 
-  |____/ |_| \_|  \___/  |_| \_| |_____|    \_____|  /_/   \_\ |_|  |_| |_____|
-    )" << RESET << endl;
+    cout << BOLD << NEON_GREEN << R"(
+  ╔══════════════════════════════════════════════════════════════════════════╗
+  ║                                                                          ║
+  ║    ███████╗███╗   ██╗ █████╗ ██╗  ██╗███████╗    ██████╗  █████╗ ███╗   ███╗███████╗   ║
+  ║    ██╔════╝████╗  ██║██╔══██╗██║ ██╔╝██╔════╝   ██╔════╝ ██╔══██╗████╗ ████║██╔════╝   ║
+  ║    ███████╗██╔██╗ ██║███████║█████╔╝ █████╗     ██║  ███╗███████║██╔████╔██║█████╗     ║
+  ║    ╚════██║██║╚██╗██║██╔══██║██╔═██╗ ██╔══╝     ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝     ║
+  ║    ███████║██║ ╚████║██║  ██║██║  ██╗███████╗   ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗   ║
+  ║    ╚══════╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝    ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝   ║
+  ║                                                                          ║
+  ╚══════════════════════════════════════════════════════════════════════════╝
+)" << RESET
+         << endl;
 
-    cout << YELLOW;
-    cout << "\n Controls:\n";
-    cout << "   W = Move Up\n";
-    cout << "   S = Move Down\n";
-    cout << "   A = Move Left\n";
-    cout << "   D = Move Right\n";
-    cout << "   R = Restart (after Game Over)\n";
-    cout << "   Q = Quit (after Game Over)\n";
-    cout << RESET;
+    cout << NEON_CYAN << BOLD << "                        🐍 THE CLASSIC ARCADE EXPERIENCE 🐍\n"
+         << RESET << endl;
 
-    cout << CYAN << "\nPress any key to start the game..." << RESET << endl;
+    cout << GOLD << BOLD << "  📋 CONTROLS:\n"
+         << RESET;
+    cout << BRIGHT_CYAN << "     W = Move Up\n";
+    cout << "     S = Move Down\n";
+    cout << "     A = Move Left\n";
+    cout << "     D = Move Right\n";
+    cout << "     R = Restart\n";
+    cout << "     Q = Quit\n" << RESET;
+
+    cout << GOLD << BOLD << "\n  🎯 OBJECTIVE:\n" << RESET;
+    cout << BRIGHT_CYAN << "     Eat the red food (@) to grow longer!\n";
+    cout << "     Avoid walls and yourself!\n" << RESET;
+
+    cout << NEON_YELLOW << BOLD << "\n  ⚡ Press ANY KEY to start! ⚡\n" << RESET;
+
     _getch();
     clearScreen();
 }
 
-int main() {
+// ---------- Main ----------
+int main()
+{
     showTitleScreen();
-    Game game(90, 25);
+    Game game(50, 20); // Adjust width & height
     game.run();
     return 0;
 }
