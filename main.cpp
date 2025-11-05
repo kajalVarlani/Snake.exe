@@ -89,8 +89,8 @@ public:
         }
 
         // collision with walls
-        if (head.x <= 0 || head.x >= height - 1 || head.y <= 0 || head.y >= width - 1)
-            return false;
+      if (head.x < 1 || head.x >= height - 1 || head.y < 1 || head.y >= width - 1)
+         return false;
 
         // collision with itself
         for (auto& seg : body)
