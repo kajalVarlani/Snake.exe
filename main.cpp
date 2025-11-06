@@ -103,33 +103,35 @@ class Food
 public:
     Food() : active(false) {}
     void generate(const deque<Point> &snakeBody, int width, int height)
+{
+    vector<Point> valid;
+    // Skip top (0), bottom (height - 1), left (0), and right (width - 1) borders
+    for (int i = 1; i < height - 2; i++) // start from 1, stop before bottom border
     {
-        vector<Point> valid;
-        for (int i = 0; i < height - 2; i++)
+        for (int j = 1; j < width - 2; j++) // start from 1, stop before right border
         {
-            for (int j = 1; j < width - 1; j++)
+            Point candidate(i, j);
+            bool onSnake = false;
+            for (auto &seg : snakeBody)
             {
-                Point candidate(i, j);
-                bool onSnake = false;
-                for (auto &seg : snakeBody)
+                if (seg == candidate)
                 {
-                    if (seg == candidate)
-                    {
-                        onSnake = true;
-                        break;
-                    }
+                    onSnake = true;
+                    break;
                 }
-                if (!onSnake)
-                    valid.push_back(candidate);
             }
-        }
-        if (!valid.empty())
-        {
-            int idx = rand() % valid.size();
-            position = valid[idx];
-            active = true;
+            if (!onSnake)
+                valid.push_back(candidate);
         }
     }
+    if (!valid.empty())
+    {
+        int idx = rand() % valid.size();
+        position = valid[idx];
+        active = true;
+    }
+}
+
     Point getPos() const { return position; }
     bool isActive() const { return active; }
     void deactivate() { active = false; }
@@ -285,35 +287,61 @@ public:
     }
 
     void input()
+{
+    if (_kbhit())
     {
-        if (_kbhit())
+        int key = _getch();
+
+#ifdef _WIN32
+        // Windows Arrow Keys (224 prefix)
+        if (key == 224)
         {
-            int key = _getch();
-            switch (tolower(key))
+            int arrow = _getch();
+            switch (arrow)
             {
-            case 'w':
-                snake.changeDir(UP);
-                break;
-            case 's':
-                snake.changeDir(DOWN);
-                break;
-            case 'a':
-                snake.changeDir(LEFT);
-                break;
-            case 'd':
-                snake.changeDir(RIGHT);
-                break;
-            case 'r':
-                if (gameOver)
-                    reset();
-                break;
-            case 'q':
-                if (gameOver)
-                    exit(0);
-                break;
+            case 72: snake.changeDir(UP); break;    // ↑
+            case 80: snake.changeDir(DOWN); break;  // ↓
+            case 75: snake.changeDir(LEFT); break;  // ←
+            case 77: snake.changeDir(RIGHT); break; // →
             }
+            return;
+        }
+#else
+        // Linux Arrow Keys (ESC [ A/B/C/D)
+        if (key == 27)
+        {
+            if (_kbhit() && _getch() == 91)
+            {
+                int arrow = _getch();
+                switch (arrow)
+                {
+                case 65: snake.changeDir(UP); break;    // ↑
+                case 66: snake.changeDir(DOWN); break;  // ↓
+                case 68: snake.changeDir(LEFT); break;  // ←
+                case 67: snake.changeDir(RIGHT); break; // →
+                }
+            }
+            return;
+        }
+#endif
+
+        // WASD Controls (work everywhere)
+        switch (tolower(key))
+        {
+        case 'w': snake.changeDir(UP); break;
+        case 's': snake.changeDir(DOWN); break;
+        case 'a': snake.changeDir(LEFT); break;
+        case 'd': snake.changeDir(RIGHT); break;
+        case 'r':
+            if (gameOver) reset();
+            break;
+        case 'q':
+            if (gameOver) exit(0);
+            break;
         }
     }
+}
+
 
     void update()
     {
