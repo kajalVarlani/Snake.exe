@@ -80,6 +80,8 @@ void clearScreen() { system("cls"); }
 #define ORANGE "\033[38;5;208m"
 
 // ---------- Classes ----------
+// to set coordinates
+// uses operator overloading to check colloisions
 class Point
 {
 public:
@@ -96,6 +98,9 @@ enum Direction
     RIGHT
 };
 
+// to generate food at random places
+// to activate or deactivate food
+// to check if food is present on the board
 class Food
 {
     Point position;
@@ -137,6 +142,9 @@ public:
     void deactivate() { active = false; }
 };
 
+// create snake
+/// change direction and prevent from moving in oppsite direction
+// move function checks wall and self colloision, checks if food is active and snake has eaten the food then gets food position and deactivates food
 class Snake
 {
     deque<Point> body;
@@ -207,6 +215,7 @@ public:
     Point getHead() const { return body.front(); }
 };
 
+//initializes game with snake and food at random place
 class Game
 {
     int width, height;
@@ -227,7 +236,6 @@ public:
 
     void draw()
     {
-        // Build entire frame in a string buffer first
         string buffer;
         buffer.reserve(10000); // Pre-allocate memory
 
@@ -247,7 +255,7 @@ public:
             buffer += BOLD;
             buffer += " ║";
             buffer += RESET;
-            
+
             for (int j = 0; j < width - 2; j++)
             {
                 Point cur(i, j + 1);
@@ -364,10 +372,18 @@ public:
                 int arrow = _getch();
                 switch (arrow)
                 {
-                case 72: snake.changeDir(UP); break;
-                case 80: snake.changeDir(DOWN); break;
-                case 75: snake.changeDir(LEFT); break;
-                case 77: snake.changeDir(RIGHT); break;
+                case 72:
+                    snake.changeDir(UP);
+                    break;
+                case 80:
+                    snake.changeDir(DOWN);
+                    break;
+                case 75:
+                    snake.changeDir(LEFT);
+                    break;
+                case 77:
+                    snake.changeDir(RIGHT);
+                    break;
                 }
                 return;
             }
@@ -379,10 +395,18 @@ public:
                     int arrow = _getch();
                     switch (arrow)
                     {
-                    case 65: snake.changeDir(UP); break;
-                    case 66: snake.changeDir(DOWN); break;
-                    case 68: snake.changeDir(LEFT); break;
-                    case 67: snake.changeDir(RIGHT); break;
+                    case 65:
+                        snake.changeDir(UP);
+                        break;
+                    case 66:
+                        snake.changeDir(DOWN);
+                        break;
+                    case 68:
+                        snake.changeDir(LEFT);
+                        break;
+                    case 67:
+                        snake.changeDir(RIGHT);
+                        break;
                     }
                 }
                 return;
@@ -391,15 +415,25 @@ public:
 
             switch (tolower(key))
             {
-            case 'w': snake.changeDir(UP); break;
-            case 's': snake.changeDir(DOWN); break;
-            case 'a': snake.changeDir(LEFT); break;
-            case 'd': snake.changeDir(RIGHT); break;
+            case 'w':
+                snake.changeDir(UP);
+                break;
+            case 's':
+                snake.changeDir(DOWN);
+                break;
+            case 'a':
+                snake.changeDir(LEFT);
+                break;
+            case 'd':
+                snake.changeDir(RIGHT);
+                break;
             case 'r':
-                if (gameOver) reset();
+                if (gameOver)
+                    reset();
                 break;
             case 'q':
-                if (gameOver) exit(0);
+                if (gameOver)
+                    exit(0);
                 break;
             }
         }
@@ -465,20 +499,25 @@ void showTitleScreen()
     cout << NEON_CYAN << BOLD << "                        THE CLASSIC ARCADE EXPERIENCE\n"
          << RESET << endl;
 
-    cout << GOLD << BOLD << "  CONTROLS:\n" << RESET;
+    cout << GOLD << BOLD << "  CONTROLS:\n"
+         << RESET;
     cout << BRIGHT_CYAN << "     W or UP ARROW    = Move Up\n";
     cout << "     S or DOWN ARROW  = Move Down\n";
     cout << "     A or LEFT ARROW  = Move Left\n";
     cout << "     D or RIGHT ARROW = Move Right\n";
     cout << "     R = Restart Game\n";
-    cout << "     Q = Quit Game\n" << RESET;
+    cout << "     Q = Quit Game\n"
+         << RESET;
 
-    cout << GOLD << BOLD << "\n  OBJECTIVE:\n" << RESET;
+    cout << GOLD << BOLD << "\n  OBJECTIVE:\n"
+         << RESET;
     cout << BRIGHT_CYAN << "     Eat the red food to grow longer!\n";
     cout << "     Avoid walls and your own body!\n";
-    cout << "     The game speeds up as you score!\n" << RESET;
+    cout << "     The game speeds up as you score!\n"
+         << RESET;
 
-    cout << NEON_YELLOW << BOLD << "\n  Press ANY KEY to start!\n" << RESET;
+    cout << NEON_YELLOW << BOLD << "\n  Press ANY KEY to start!\n"
+         << RESET;
 
     _getch();
     clearScreen();
@@ -490,7 +529,7 @@ int main()
 #ifdef _WIN32
     // Set UTF-8 encoding
     SetConsoleOutputCP(CP_UTF8);
-    
+
     // Hide cursor
     HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO info;
@@ -505,11 +544,11 @@ int main()
     showTitleScreen();
     Game game(80, 30);
     game.run();
-    
+
 #ifndef _WIN32
     // Show cursor again on exit
     cout << "\033[?25h";
 #endif
-    
+
     return 0;
 }
