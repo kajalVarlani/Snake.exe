@@ -100,7 +100,6 @@ Displays **high score** (stored until the program exits).
 | **Snake** | Handles direction, movement, growth, and self-collision detection.                      |
 | **Game**  | Manages drawing, input, score, game logic, and rendering loop.                          |
 
-```
 
 ---
 
