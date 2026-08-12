@@ -1,15 +1,16 @@
+#include <windows.h>
 #include <iostream>
 #include <vector>
 #include <deque>
 #include <cstdlib>
 #include <ctime>
 #include <cctype>
+#include <string>
 using namespace std;
 
 // Platform-specific headers
 #ifdef _WIN32
 #include <conio.h>
-#include <windows.h>
 #else
 #include <unistd.h>
 #include <termios.h>
@@ -54,7 +55,7 @@ int _getch()
 }
 
 void Sleep(int ms) { usleep(ms * 1000); }
-void clearScreen() { system("clear"); }
+void clearScreen() { cout << "\033[2J\033[H"; }
 #else
 void clearScreen() { system("cls"); }
 #endif
@@ -80,8 +81,6 @@ void clearScreen() { system("cls"); }
 #define ORANGE "\033[38;5;208m"
 
 // ---------- Classes ----------
-// to set coordinates
-// uses operator overloading to check colloisions
 class Point
 {
 public:
@@ -98,9 +97,6 @@ enum Direction
     RIGHT
 };
 
-// to generate food at random places
-// to activate or deactivate food
-// to check if food is present on the board
 class Food
 {
     Point position;
@@ -108,24 +104,35 @@ class Food
 
 public:
     Food() : active(false) {}
-    void generate(const deque<Point> &snakeBody, int width, int height)
+    void generate(const deque<Point> &snake1Body, const deque<Point> &snake2Body, int width, int height)
     {
         vector<Point> valid;
-        for (int i = 1; i < height - 2; i++)
+        for (int i = 0; i < height - 1; i++)
         {
-            for (int j = 1; j < width - 2; j++)
+            for (int j = 1; j < width - 1; j++)
             {
                 Point candidate(i, j);
-                bool onSnake = false;
-                for (auto &seg : snakeBody)
+                bool occupied = false;
+                for (auto &seg : snake1Body)
                 {
                     if (seg == candidate)
                     {
-                        onSnake = true;
+                        occupied = true;
                         break;
                     }
                 }
-                if (!onSnake)
+                if (!occupied)
+                {
+                    for (auto &seg : snake2Body)
+                    {
+                        if (seg == candidate)
+                        {
+                            occupied = true;
+                            break;
+                        }
+                    }
+                }
+                if (!occupied)
                     valid.push_back(candidate);
             }
         }
@@ -142,34 +149,49 @@ public:
     void deactivate() { active = false; }
 };
 
-// create snake
-/// change direction and prevent from moving in oppsite direction
-// move function checks wall and self colloision, checks if food is active and snake has eaten the food then gets food position and deactivates food
 class Snake
 {
     deque<Point> body;
     Direction dir;
+    Direction lastMovedDir;
 
 public:
-    Snake(int width, int height)
+    Snake(int startX, int startY, Direction initialDir)
     {
-        dir = RIGHT;
-        int startX = height / 2;
-        int startY = width / 2;
+        dir = initialDir;
+        lastMovedDir = initialDir;
         body.push_back(Point(startX, startY));
-        body.push_back(Point(startX, startY - 1));
-        body.push_back(Point(startX, startY - 2));
+        if (initialDir == RIGHT)
+        {
+            body.push_back(Point(startX, startY - 1));
+            body.push_back(Point(startX, startY - 2));
+        }
+        else if (initialDir == LEFT)
+        {
+            body.push_back(Point(startX, startY + 1));
+            body.push_back(Point(startX, startY + 2));
+        }
+        else if (initialDir == UP)
+        {
+            body.push_back(Point(startX + 1, startY));
+            body.push_back(Point(startX + 2, startY));
+        }
+        else
+        {
+            body.push_back(Point(startX - 1, startY));
+            body.push_back(Point(startX - 2, startY));
+        }
     }
 
     void changeDir(Direction newDir)
     {
-        if ((dir == UP && newDir == DOWN) || (dir == DOWN && newDir == UP) ||
-            (dir == LEFT && newDir == RIGHT) || (dir == RIGHT && newDir == LEFT))
+        if ((lastMovedDir == UP && newDir == DOWN) || (lastMovedDir == DOWN && newDir == UP) ||
+            (lastMovedDir == LEFT && newDir == RIGHT) || (lastMovedDir == RIGHT && newDir == LEFT))
             return;
         dir = newDir;
     }
 
-    bool move(Food &food, int &score, int width, int height)
+    Point getNextHead() const
     {
         Point head = body.front();
         switch (dir)
@@ -187,62 +209,85 @@ public:
             head.y++;
             break;
         }
+        return head;
+    }
 
+    bool willCollide(Point nextHead, int width, int height, const deque<Point> &otherBody) const
+    {
         // Wall collision
-        if (head.x < 0 || head.x >= height - 1 || head.y <= 0 || head.y >= width - 1)
-            return false;
+        if (nextHead.x < 0 || nextHead.x >= height - 1 || nextHead.y <= 0 || nextHead.y >= width - 1)
+            return true;
 
         // Self collision
         for (auto &seg : body)
-            if (head == seg)
-                return false;
+            if (nextHead == seg)
+                return true;
 
-        body.push_front(head);
+        // Other snake collision
+        for (auto &seg : otherBody)
+            if (nextHead == seg)
+                return true;
 
-        if (food.isActive() && head == food.getPos())
+        return false;
+    }
+
+    bool moveForward(Point nextHead, Food &food, int &score)
+    {
+        lastMovedDir = dir;
+        body.push_front(nextHead);
+
+        if (food.isActive() && nextHead == food.getPos())
         {
             score++;
-            food.deactivate();
+            return true;
         }
         else
         {
             body.pop_back();
+            return false;
         }
-        return true;
     }
 
     const deque<Point> &getBody() const { return body; }
     Point getHead() const { return body.front(); }
 };
 
-//initializes game with snake and food at random place
 class Game
 {
     int width, height;
-    Snake snake;
+    Snake snake1;
+    Snake snake2;
     Food food;
-    int score, highScore;
+    int score1, score2, highScore;
     bool gameOver;
+    bool paused;
+    int loser; // 0 = none, 1 = P1, 2 = P2, 3 = Both
 
 public:
-    Game(int w = 40, int h = 20) : width(w), height(h), snake(w, h)
+    Game(int w = 50, int h = 20)
+        : width(w), height(h),
+          snake1(h / 2 - 2, 10, RIGHT),
+          snake2(h / 2 + 2, w - 11, LEFT)
     {
-        srand(time(0));
-        score = 0;
+        srand(static_cast<unsigned int>(time(0)));
+        score1 = 0;
+        score2 = 0;
         highScore = 0;
         gameOver = false;
-        food.generate(snake.getBody(), width, height);
+        paused = false;
+        loser = 0;
+        food.generate(snake1.getBody(), snake2.getBody(), width, height);
     }
 
     void draw()
     {
         string buffer;
-        buffer.reserve(10000); // Pre-allocate memory
+        buffer.reserve(8000);
 
         // Top border
         buffer += BRIGHT_CYAN;
         buffer += BOLD;
-        buffer += " ╔";
+        buffer += "╔";
         for (int j = 0; j < width - 2; j++)
             buffer += "═";
         buffer += "╗\n";
@@ -253,15 +298,25 @@ public:
         {
             buffer += BRIGHT_CYAN;
             buffer += BOLD;
-            buffer += " ║";
+            buffer += "║";
             buffer += RESET;
 
             for (int j = 0; j < width - 2; j++)
             {
                 Point cur(i, j + 1);
-                if (snake.getHead() == cur)
+
+                // Check Snake 1 Head
+                if (snake1.getHead() == cur)
                 {
                     buffer += BRIGHT_GREEN;
+                    buffer += BOLD;
+                    buffer += "●";
+                    buffer += RESET;
+                }
+                // Check Snake 2 Head
+                else if (snake2.getHead() == cur)
+                {
+                    buffer += NEON_PURPLE;
                     buffer += BOLD;
                     buffer += "●";
                     buffer += RESET;
@@ -269,9 +324,11 @@ public:
                 else
                 {
                     bool isBody = false;
-                    for (auto &seg : snake.getBody())
+
+                    // Check Snake 1 Body
+                    for (auto &seg : snake1.getBody())
                     {
-                        if (seg == cur && !(seg == snake.getHead()))
+                        if (seg == cur && !(seg == snake1.getHead()))
                         {
                             buffer += NEON_GREEN;
                             buffer += "●";
@@ -280,6 +337,24 @@ public:
                             break;
                         }
                     }
+
+                    // Check Snake 2 Body
+                    if (!isBody)
+                    {
+                        for (auto &seg : snake2.getBody())
+                        {
+                            if (seg == cur && !(seg == snake2.getHead()))
+                            {
+                                buffer += PINK;
+                                buffer += "●";
+                                buffer += RESET;
+                                isBody = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Check Food
                     if (!isBody)
                     {
                         if (food.isActive() && cur == food.getPos())
@@ -290,21 +365,22 @@ public:
                             buffer += RESET;
                         }
                         else
+                        {
                             buffer += " ";
+                        }
                     }
                 }
             }
             buffer += BRIGHT_CYAN;
             buffer += BOLD;
-            buffer += "║";
+            buffer += "║\n";
             buffer += RESET;
-            buffer += "\n";
         }
 
         // Bottom border
         buffer += BRIGHT_CYAN;
         buffer += BOLD;
-        buffer += " ╚";
+        buffer += "╚";
         for (int j = 0; j < width - 2; j++)
             buffer += "═";
         buffer += "╝\n";
@@ -313,12 +389,21 @@ public:
         // Score display
         buffer += GOLD;
         buffer += BOLD;
-        buffer += " > ";
+        buffer += "> ";
         buffer += RESET;
-        buffer += YELLOW;
-        buffer += "Score: ";
+        buffer += LIGHT_GREEN;
         buffer += BOLD;
-        buffer += to_string(score);
+        buffer += "P1 Score: ";
+        buffer += to_string(score1);
+        buffer += RESET;
+        buffer += GOLD;
+        buffer += BOLD;
+        buffer += "  |  ";
+        buffer += RESET;
+        buffer += PINK;
+        buffer += BOLD;
+        buffer += "P2 Score: ";
+        buffer += to_string(score2);
         buffer += RESET;
         buffer += GOLD;
         buffer += BOLD;
@@ -326,31 +411,59 @@ public:
         buffer += RESET;
         buffer += ORANGE;
         buffer += "High Score: ";
-        buffer += BOLD;
         buffer += to_string(highScore);
         buffer += RESET;
-        buffer += "\n";
+        buffer += "          \n";
 
         if (gameOver)
         {
             buffer += NEON_RED;
             buffer += BOLD;
-            buffer += " > GAME OVER! ";
+            buffer += "> GAME OVER! ";
+            buffer += RESET;
+            if (loser == 1)
+            {
+                buffer += LIGHT_GREEN;
+                buffer += BOLD;
+                buffer += "Player 1 Lost! (Player 2 Wins!) ";
+            }
+            else if (loser == 2)
+            {
+                buffer += PINK;
+                buffer += BOLD;
+                buffer += "Player 2 Lost! (Player 1 Wins!) ";
+            }
+            else
+            {
+                buffer += YELLOW;
+                buffer += BOLD;
+                buffer += "Both Players Lost! (Draw) ";
+            }
             buffer += RESET;
             buffer += CYAN;
-            buffer += "Press R to restart or Q to quit";
+            buffer += "| R: Restart | Q: Quit";
+            buffer += RESET;
+            buffer += "    \n";
+        }
+        else if (paused)
+        {
+            buffer += NEON_YELLOW;
+            buffer += BOLD;
+            buffer += "> PAUSED! ";
+            buffer += RESET;
+            buffer += CYAN;
+            buffer += "Press P to resume                        ";
             buffer += RESET;
             buffer += "\n";
         }
         else
         {
             buffer += DIM_CYAN;
-            buffer += " > Use WASD or Arrow Keys to move";
+            buffer += "> P1: Arrow Keys | P2: WASD | P: Pause";
             buffer += RESET;
-            buffer += "\n";
+            buffer += "          \n";
         }
 
-        // Now output everything at once with cursor reset
 #ifdef _WIN32
         COORD coord = {0, 0};
         SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
@@ -362,30 +475,33 @@ public:
 
     void input()
     {
-        if (_kbhit())
+        while (_kbhit())
         {
             int key = _getch();
 
 #ifdef _WIN32
-            if (key == 224)
+            if (key == 0 || key == 224)
             {
                 int arrow = _getch();
-                switch (arrow)
+                if (!paused && !gameOver)
                 {
-                case 72:
-                    snake.changeDir(UP);
-                    break;
-                case 80:
-                    snake.changeDir(DOWN);
-                    break;
-                case 75:
-                    snake.changeDir(LEFT);
-                    break;
-                case 77:
-                    snake.changeDir(RIGHT);
-                    break;
+                    switch (arrow)
+                    {
+                    case 72:
+                        snake1.changeDir(UP);
+                        break;
+                    case 80:
+                        snake1.changeDir(DOWN);
+                        break;
+                    case 75:
+                        snake1.changeDir(LEFT);
+                        break;
+                    case 77:
+                        snake1.changeDir(RIGHT);
+                        break;
+                    }
                 }
-                return;
+                continue;
             }
 #else
             if (key == 27)
@@ -393,85 +509,134 @@ public:
                 if (_kbhit() && _getch() == 91)
                 {
                     int arrow = _getch();
-                    switch (arrow)
+                    if (!paused && !gameOver)
                     {
-                    case 65:
-                        snake.changeDir(UP);
-                        break;
-                    case 66:
-                        snake.changeDir(DOWN);
-                        break;
-                    case 68:
-                        snake.changeDir(LEFT);
-                        break;
-                    case 67:
-                        snake.changeDir(RIGHT);
-                        break;
+                        switch (arrow)
+                        {
+                        case 65:
+                            snake1.changeDir(UP);
+                            break;
+                        case 66:
+                            snake1.changeDir(DOWN);
+                            break;
+                        case 68:
+                            snake1.changeDir(LEFT);
+                            break;
+                        case 67:
+                            snake1.changeDir(RIGHT);
+                            break;
+                        }
                     }
                 }
-                return;
+                continue;
             }
 #endif
 
-            switch (tolower(key))
+            char lowerKey = tolower(key);
+            if (lowerKey == 'p' && !gameOver)
             {
-            case 'w':
-                snake.changeDir(UP);
-                break;
-            case 's':
-                snake.changeDir(DOWN);
-                break;
-            case 'a':
-                snake.changeDir(LEFT);
-                break;
-            case 'd':
-                snake.changeDir(RIGHT);
-                break;
-            case 'r':
-                if (gameOver)
-                    reset();
-                break;
-            case 'q':
-                if (gameOver)
-                    exit(0);
-                break;
+                paused = !paused;
+            }
+            else if (lowerKey == 'r' && gameOver)
+            {
+                reset();
+            }
+            else if (lowerKey == 'q' && gameOver)
+            {
+                cout << "\033[?25h" << endl;
+                exit(0);
+            }
+            else if (!paused && !gameOver)
+            {
+                switch (lowerKey)
+                {
+                case 'w':
+                    snake2.changeDir(UP);
+                    break;
+                case 's':
+                    snake2.changeDir(DOWN);
+                    break;
+                case 'a':
+                    snake2.changeDir(LEFT);
+                    break;
+                case 'd':
+                    snake2.changeDir(RIGHT);
+                    break;
+                }
             }
         }
     }
 
     void update()
     {
-        if (!gameOver)
+        if (!gameOver && !paused)
         {
-            if (!snake.move(food, score, width, height))
+            Point head1 = snake1.getNextHead();
+            Point head2 = snake2.getNextHead();
+
+            bool col1 = snake1.willCollide(head1, width, height, snake2.getBody());
+            bool col2 = snake2.willCollide(head2, width, height, snake1.getBody());
+
+            if (head1 == head2)
+            {
+                col1 = true;
+                col2 = true;
+            }
+
+            if (col1 || col2)
             {
                 gameOver = true;
-                if (score > highScore)
-                    highScore = score;
+                if (col1 && col2)
+                    loser = 3;
+                else if (col1)
+                    loser = 1;
+                else
+                    loser = 2;
+
+                if (score1 > highScore)
+                    highScore = score1;
+                if (score2 > highScore)
+                    highScore = score2;
+                return;
+            }
+
+            bool ate1 = snake1.moveForward(head1, food, score1);
+            bool ate2 = snake2.moveForward(head2, food, score2);
+
+            if (ate1 || ate2)
+            {
+                food.deactivate();
+                food.generate(snake1.getBody(), snake2.getBody(), width, height);
             }
             else if (!food.isActive())
             {
-                food.generate(snake.getBody(), width, height);
+                food.generate(snake1.getBody(), snake2.getBody(), width, height);
             }
         }
     }
 
     void reset()
     {
-        snake = Snake(width, height);
-        score = 0;
-        food.generate(snake.getBody(), width, height);
+        snake1 = Snake(height / 2 - 2, 10, RIGHT);
+        snake2 = Snake(height / 2 + 2, width - 11, LEFT);
+        score1 = 0;
+        score2 = 0;
         gameOver = false;
+        paused = false;
+        loser = 0;
+        food.generate(snake1.getBody(), snake2.getBody(), width, height);
     }
 
     void run()
     {
+        clearScreen();
         while (true)
         {
             draw();
             input();
             update();
-            int speed = max(40, 150 - score * 5);
+            int maxScore = max(score1, score2);
+            int speed = max(40, 150 - maxScore * 5);
             Sleep(speed);
         }
     }
@@ -487,33 +652,34 @@ void showTitleScreen()
   ║                                                                                       ║
   ║    ███████╗███╗   ██╗ █████╗ ██╗  ██╗███████╗    ██████╗  █████╗ ███╗   ███╗███████╗  ║
   ║    ██╔════╝████╗  ██║██╔══██╗██║ ██╔╝██╔════╝   ██╔════╝ ██╔══██╗████╗ ████║██╔════╝  ║
-  ║    ███████╗██╔██╗ ██║███████║█████╔╝ █████╗     ██║  ███╗███████║██╔████╔██║█████╗    ║
-  ║    ╚════██║██║╚██╗██║██╔══██║██╔═██╗ ██╔══╝     ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝    ║
+  ║    ███████╗██╔██╗ ██║███████║█████╔╝ █████╗      ██║  ███╗███████║██╔████╔██║█████╗  ║
+  ║    ╚════██║██║╚██╗██║██╔══██║██╔═██╗ ██╔══╝      ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  ║
   ║    ███████║██║ ╚████║██║  ██║██║  ██╗███████╗   ╚██████╔╝██║  ██║██║ ╚═╝ ██║██████╗   ║
   ║    ╚══════╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝    ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚═════╝   ║
   ║                                                                                       ║
-  ╚══════════════════════════════════════════════════════════════════════════════════════=╝
+  ╚═══════════════════════════════════════════════════════════════════════════════════════╝
 )" << RESET
          << endl;
 
-    cout << NEON_CYAN << BOLD << "                        THE CLASSIC ARCADE EXPERIENCE\n"
+    cout << NEON_CYAN << BOLD << "                    MULTIPLAYER ARCADE EXPERIENCE (2 PLAYERS)\n"
          << RESET << endl;
 
     cout << GOLD << BOLD << "  CONTROLS:\n"
          << RESET;
-    cout << BRIGHT_CYAN << "     W or UP ARROW    = Move Up\n";
-    cout << "     S or DOWN ARROW  = Move Down\n";
-    cout << "     A or LEFT ARROW  = Move Left\n";
-    cout << "     D or RIGHT ARROW = Move Right\n";
-    cout << "     R = Restart Game\n";
-    cout << "     Q = Quit Game\n"
+    cout << BRIGHT_GREEN << "     PLAYER 1 (Green)  : ARROW KEYS (Up, Down, Left, Right)\n"
+         << RESET;
+    cout << PINK << "     PLAYER 2 (Purple) : W, A, S, D\n"
+         << RESET;
+    cout << BRIGHT_CYAN << "     P                 : Pause / Resume\n";
+    cout << "     R                 : Restart Game\n";
+    cout << "     Q                 : Quit Game\n"
          << RESET;
 
     cout << GOLD << BOLD << "\n  OBJECTIVE:\n"
          << RESET;
-    cout << BRIGHT_CYAN << "     Eat the red food to grow longer!\n";
-    cout << "     Avoid walls and your own body!\n";
-    cout << "     The game speeds up as you score!\n"
+    cout << BRIGHT_CYAN << "     Both snakes compete for the same food (◆)!\n";
+    cout << "     Whoever eats the food first grows and scores a point.\n";
+    cout << "     Avoid hitting walls, yourself, or the other snake!\n"
          << RESET;
 
     cout << NEON_YELLOW << BOLD << "\n  Press ANY KEY to start!\n"
@@ -530,25 +696,31 @@ int main()
     // Set UTF-8 encoding
     SetConsoleOutputCP(CP_UTF8);
 
-    // Hide cursor
-    HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    // Enable Virtual Terminal Processing for ANSI escape sequences
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD dwMode = 0;
+    if (GetConsoleMode(hOut, &dwMode))
+    {
+        dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT;
+        SetConsoleMode(hOut, dwMode);
+    }
+
+    // Hide console cursor
     CONSOLE_CURSOR_INFO info;
     info.dwSize = 100;
     info.bVisible = FALSE;
-    SetConsoleCursorInfo(consoleHandle, &info);
+    SetConsoleCursorInfo(hOut, &info);
 #else
     // Hide cursor on Linux
     cout << "\033[?25l";
 #endif
 
     showTitleScreen();
-    Game game(80, 30);
+    Game game(50, 20);
     game.run();
 
-#ifndef _WIN32
     // Show cursor again on exit
     cout << "\033[?25h";
-#endif
 
     return 0;
 }
