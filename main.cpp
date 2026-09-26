@@ -215,6 +215,31 @@ public:
     Point getHead() const { return body.front(); }
 };
 
+// keyboard and process exit used by the game loop
+// tests pass their own Console to supply keys and catch quit()
+class Console
+{
+public:
+    virtual ~Console() {}
+    virtual bool keyPressed() = 0;
+    virtual int readKey() = 0;
+    virtual void quit(int code) = 0;
+};
+
+class RealConsole : public Console
+{
+public:
+    bool keyPressed() { return _kbhit(); }
+    int readKey() { return _getch(); }
+    void quit(int code) { exit(code); }
+};
+
+Console &realConsole()
+{
+    static RealConsole console;
+    return console;
+}
+
 //initializes game with snake and food at random place
 class Game
 {
@@ -223,9 +248,10 @@ class Game
     Food food;
     int score, highScore;
     bool gameOver;
+    Console &console;
 
 public:
-    Game(int w = 40, int h = 20) : width(w), height(h), snake(w, h)
+    Game(int w = 40, int h = 20, Console &c = realConsole()) : width(w), height(h), snake(w, h), console(c)
     {
         srand(time(0));
         score = 0;
@@ -362,14 +388,14 @@ public:
 
     void input()
     {
-        if (_kbhit())
+        if (console.keyPressed())
         {
-            int key = _getch();
+            int key = console.readKey();
 
 #ifdef _WIN32
             if (key == 224)
             {
-                int arrow = _getch();
+                int arrow = console.readKey();
                 switch (arrow)
                 {
                 case 72:
@@ -390,9 +416,9 @@ public:
 #else
             if (key == 27)
             {
-                if (_kbhit() && _getch() == 91)
+                if (console.keyPressed() && console.readKey() == 91)
                 {
-                    int arrow = _getch();
+                    int arrow = console.readKey();
                     switch (arrow)
                     {
                     case 65:
@@ -433,7 +459,7 @@ public:
                 break;
             case 'q':
                 if (gameOver)
-                    exit(0);
+                    console.quit(0);
                 break;
             }
         }
